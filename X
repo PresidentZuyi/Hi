@@ -1,0 +1,130 @@
+-- Ensure player is defined
+local player = game.Players.LocalPlayer
+
+local function cleanup()
+    -- Remove any existing cloned ability buttons
+    if player.PlayerGui.InGameUI.Bottom.Abilities:FindFirstChild("GojoDribblingButton") then
+        player.PlayerGui.InGameUI.Bottom.Abilities:FindFirstChild("GojoDribblingButton"):Destroy()
+    end
+end
+
+local function initializeAbility()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- The animation for the dribble/drive move
+    local animation = Instance.new("Animation")
+    animation.AnimationId = "rbxassetid://105090928177684"  -- Corrected animation ID
+    local animationTrack = humanoid:LoadAnimation(animation)
+
+    -- Sound for the move
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://6606602837"  -- Change the sound ID
+    sound.Parent = humanoidRootPart  -- You can attach the sound to the character's root part
+
+    -- Function to create a glowing effect on the player's body
+    local function createGlowEffect()
+        local glow = Instance.new("SelectionBox")
+        glow.Adornee = humanoidRootPart
+        glow.LineThickness = 0.1
+        glow.SurfaceTransparency = 0.5
+        glow.Color3 = Color3.fromRGB(0, 255, 255)  -- Cyan color
+        glow.Parent = humanoidRootPart
+        return glow
+    end
+
+    -- Function to create a wind effect
+    local function createWindEffect()
+        local wind = Instance.new("ParticleEmitter")
+        wind.Texture = "rbxassetid://1316045217"  -- Replace with your desired wind texture
+        wind.Lifetime = NumberRange.new(0.5, 1)
+        wind.Rate = 50
+        wind.Size = NumberSequence.new(1, 2)
+        wind.Speed = NumberRange.new(10, 15)
+        wind.Rotation = NumberRange.new(0, 360)
+        wind.RotSpeed = NumberRange.new(100, 200)
+        wind.Parent = humanoidRootPart
+        return wind
+    end
+
+    -- Function to trigger the ability
+    local function triggerAbility()
+        -- Play the sound at the start of the move
+        sound:Play()
+
+        -- Start the animation immediately (dribble animation)
+        animationTrack:Play()
+        animationTrack:AdjustSpeed(1)
+
+        -- Create the glowing effect on the player's body
+        local glowEffect = createGlowEffect()
+
+        -- Create the wind effect
+        local windEffect = createWindEffect()
+
+        -- Move the player forward significantly
+        local moveDirection = humanoidRootPart.CFrame.LookVector  -- Get the forward direction of the player
+        local moveForce = 60  -- Increase this force value to make the movement stronger
+
+        -- Apply a BodyVelocity to move the player forward with much more force
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(50000, 50000, 50000)  -- Set max force so that it moves the player
+        bodyVelocity.Velocity = moveDirection * moveForce  -- Apply force in the forward direction
+        bodyVelocity.Parent = humanoidRootPart
+
+        -- Make the player temporarily invincible (iframe effect)
+        local originalHealth = humanoid.Health
+        humanoid.Health = math.huge  -- Set health to a very high value to prevent death (iframe)
+
+        -- After a short delay, restore the player's health and stop the invincibility
+        game:GetService("Debris"):AddItem(bodyVelocity, 1)  -- Remove the BodyVelocity after 1 second
+
+        -- Wait for the animation to end, then remove the glow effect and wind effect
+        animationTrack.Stopped:Wait()
+        glowEffect:Destroy()
+        windEffect.Enabled = false
+        game:GetService("Debris"):AddItem(windEffect, 1)  -- Remove the wind effect after 1 second
+
+        wait(1)  -- Longer iframe duration (you can adjust this time)
+        humanoid.Health = originalHealth  -- Restore the player's health
+    end
+
+    -- Clone the ability button (for mobile or GUI use)
+    local Clone2 = player.PlayerGui.InGameUI.Bottom.Abilities["1"]:Clone()
+    Clone2.Name = "GojoDribblingButton"
+    Clone2.Parent = player.PlayerGui.InGameUI.Bottom.Abilities
+    Clone2.LayoutOrder = 8
+    Clone2.Keybind.Text = "B"
+    Clone2.Timer.Text = "Monk Style"
+    Clone2.ActualTimer.Text = ""
+    Clone2.Cooldown:Destroy()
+
+    -- Listen for the button activation (when clicked)
+    Clone2.Activated:Connect(function()
+        -- Trigger the ability when the button is clicked
+        triggerAbility()
+    end)
+
+    -- Listen for the "B" key press (PC input)
+    game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end  -- Ignore if the game has already processed this input (e.g., typing in chat)
+
+        if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.B then
+            -- Trigger the ability when the "B" key is pressed
+            triggerAbility()
+        end
+    end)
+end
+
+-- Reinitialize the ability each time the character is added (e.g., when joining a match)
+player.CharacterAdded:Connect(function()
+    cleanup()
+    initializeAbility()
+end)
+
+-- Initial cleanup and ability initialization
+cleanup()
+if player.Character then
+    initializeAbility()
+end
